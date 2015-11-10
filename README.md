@@ -2,7 +2,9 @@ stm32f10x-i2c-lib
 ====================
 
 #iic lib for stm32f10x  language:C++
-##and now just for master mode no slave mode
+##And now just for master mode no slave mode
 
-one of my stm32 lib
+####You are welcome to modify and develop participation
+
+(One of my stm32 lib)
 
