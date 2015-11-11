@@ -1,0 +1,15 @@
+#OUTPUT FOLDER
+out
+listing
+
+#project file
+*.txt
+*.ini
+*.htm
+*.uvguix.*
+*.bak
+*.dep
+*.uvoptx
+
+
+
