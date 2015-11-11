@@ -7,7 +7,10 @@ stm32f10x-i2c-lib
 * Use interrupt way
 * Use DMA whit interrupt way
 
-##iic lib for stm32f10x  language:C++
+##iic lib for stm32f10x  
+* language:C++
+* Demo IDE:keil5 (MDK)
+
 ###And now just for master mode no slave mode
 
 ####You are welcome to participate modify and develop
