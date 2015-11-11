@@ -124,7 +124,7 @@ class I2C
 		///@attention only one group should be used in one project. 
 		///           The bigger the priority value,the lower level priority.Every group's detail @see NVIC_Priority_Table at the end of this file
 		/////////////////////////////////////
-		I2C(u8 i2cNumber=1,u32 speed=00000,u8 remap=0,u8 priorityGroup=3,
+		I2C(u8 i2cNumber=1,u32 speed=200000,u8 remap=0,u8 priorityGroup=3,
 					uint8_t preemprionPriorityEvent=2,uint8_t subPriorityEvent=0,
 					uint8_t preemprionPriorityError=0,uint8_t subPriorityError=0,
 					uint8_t preemprionPriorityDma=1,uint8_t subPriorityDma=0);
