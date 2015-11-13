@@ -1,6 +1,8 @@
 #OUTPUT FOLDER
 out
 listing
+Listings
+Objects
 
 #project file
 *.txt

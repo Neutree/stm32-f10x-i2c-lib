@@ -27,6 +27,57 @@ u8 I2C::IsSendOk()
 	return 1;
 }
 
+//////////////////////////
+///wait until transfer complete
+//////////////////////////
+bool I2C::WaitTransferComplete(bool errorReset,bool errorClearCmdQueue)
+{
+	u16 timeOut=0;
+	u8 status=1;
+	u8 temp;
+	while(1)
+	{
+		temp=this->IsSendOk();
+		
+		if(temp==1)
+		{
+			status=1;
+			if(this->mState==STATE_READY)//等待，直到命令执行完毕
+				break;
+			else if(this->mState==STATE_ERROR)//如果在最后一个命令执行过程中出现错误
+			{
+				status=0;
+				break;
+			}
+		}
+		else if(temp==2)
+		{
+			status=0;
+			break;
+		}
+		++timeOut;
+		if(timeOut>65534)
+		{			
+			status=0;
+			break;
+		}
+	}
+	if(status!=1)
+	{
+		if(errorClearCmdQueue)
+			this->ClearCommand();//清空当前队列里的命令
+		if(errorReset)
+		{
+			if(this->mI2C==I2C2)
+				this->Init(2);
+			else
+				this->Init(1);
+		}
+		return false;
+	}
+	return true;
+}
+
 bool I2C::AddCommand(u8 device_addr,u8 register_addr, u8* data_write, u8 sendNum,u8* data_read, u8 receiveNum)
 {
 	I2C_Command_Struct IIC_CMD_Temp;	
@@ -245,8 +296,6 @@ void I2C::EventIRQ()
 					}
 					else//队列为空，
 					{
-						//已经写完，发送停止信号
-						I2C_AcknowledgeConfig(mI2C,DISABLE);	//失能应答
 						
 						mState=STATE_READY;//将状态设置为 准备好发送 模式
 					}
@@ -482,10 +531,10 @@ bool I2C::Init(u8 i2cNumber,u32 speed,u8 remap,u8 priorityGroup,
 //	RCC_APB1PeriphResetCmd(i2cClk,ENABLE);//重置clk时钟 防止有错误标志 // I2C_DeInit(I2C);  //将IIC端口初始化，否则GPIO不能被操作
 //	RCC_APB1PeriphResetCmd(i2cClk,DISABLE);//关闭clk重置
 //	RCC_APB1PeriphClockCmd(i2cClk,DISABLE);//关闭CLK时钟
-//	
-//	//dma默认值
-//	DMA_DeInit(mDmaTxChannel);
-//	DMA_DeInit(mDmaRxChannel);
+	
+	//dma默认值  重要，不能去掉，不然在硬件连接有错时可能会导致DMA无法恢复，以致不能使用DMA发送数据
+	DMA_DeInit(mDmaTxChannel);
+	DMA_DeInit(mDmaRxChannel);
 	
 /////初始化	
 	//I2C CLK初始化
