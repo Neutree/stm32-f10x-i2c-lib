@@ -11,9 +11,12 @@ stm32f10x-i2c-lib
 * language:C++
 * Demo IDE:keil5 (MDK)
 
-###And now just for master mode no slave mode
+## feature
+* now just for master mode no slave mode
+* with highly fault-tolerant ability (can recover from disconnect
+
 
 ####You are welcome to participate modify and develop
 
-(One of my stm32 lib)
+(One of my stm32 Peripheral and module lib)
 
