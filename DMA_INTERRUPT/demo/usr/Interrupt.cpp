@@ -86,8 +86,10 @@ void DMA1_Channel4_IRQHandler()
 		pUSART1->DmaIrq();
 #endif
 	#ifdef USE_I2C
+	#ifdef I2C_USE_DMA
 		if(pI2C2)
 			pI2C2->DmaTxIRQ();
+	#endif
 	#endif
 }
 
@@ -100,8 +102,10 @@ void DMA1_Channel4_IRQHandler()
 void DMA1_Channel5_IRQHandler()
 {
 	#ifdef USE_I2C
+	#ifdef I2C_USE_DMA
 		if(pI2C2)
 			pI2C2->DmaRxIRQ();
+	#endif
 	#endif
 }
 
@@ -113,8 +117,10 @@ void DMA1_Channel5_IRQHandler()
 void DMA1_Channel6_IRQHandler()
 {
 #ifdef USE_I2C
+#ifdef I2C_USE_DMA
 	if(pI2C1)
 		pI2C1->DmaTxIRQ();
+#endif
 #endif
 }
 
@@ -131,8 +137,10 @@ void DMA1_Channel7_IRQHandler()
 #endif
 	
 #ifdef USE_I2C
+#ifdef I2C_USE_DMA
 	if(pI2C1)
 		pI2C1->DmaRxIRQ();
+#endif
 #endif
 }
 

@@ -15,7 +15,6 @@
 #include "stm32f10x.h"
 #include "stm32f10x_usart.h"
 #include "FIFOBuffer.h"
-#include "math.h"
 /**
   *@addtogroup USART_CONFIGURATION
   *@{
@@ -49,6 +48,7 @@ private:
 	uint32_t dmaGlFlagChannel;//dma中断标志位
 	bool isBusySend;
 	bool mUseDma;
+	unsigned char mPrecision;
 public:
 
 	///////////////////////////
@@ -62,17 +62,17 @@ public:
 	///@param USART	 选择串口编号 1-3 ,对应的引脚请看下面重映射处        default:1
 	///@param baud -串口的波特率              default:9600
 	///@param useDMA  true:if you want to send data by DMA false:don't use dma to send data
+	///@param remap -if remap 0x00:no remap  0x01:half remap 0x11:remap  default:0x00 . which pin @see USART_Pin_Table at the bottom of this file
 	///@param Prioritygroup -中断优先级分组   default:3  优先级分组详情请看文件末尾
 	///@param preemprionPriority -抢占优先级  default:7  优先级分组详情请看文件末尾
 	///@param subPriority -响应优先级         default:1  优先级分组详情请看文件末尾
-	///@param remap -if remap 0x00:no remap  0x01:half remap 0x11:remap  default:0x00 . which pin @see USART_Pin_Table at the bottom of this file
+	///@param dmaPriority set the priority of DMA default:3(low) (0:DMA_Priority_VeryHigh 1:DMA_Priority_High 2:DMA_Priority_Medium 3:DMA_Priority_Low)
 	///@param  parity usart parity value: USART_Parity_No  USART_Parity_Even  USART_Parity_Odd      default:USART_Parity_No
 	///@param  wordLength   USART_WordLength_9b  USART_WordLength_8b                                default:USART_WordLength_8b
 	///@param  stopBits  USART_StopBits_1 USART_StopBits_0_5  USART_StopBits_2  USART_StopBits_1_5  default:USART_StopBits_1
 	////////////////////
-	USART(u8 USART=1,uint32_t baud=9600,bool useDMA=false,u8 Prioritygroup=3,uint8_t preemprionPriority=7,uint8_t subPriority=1,u8 remap=0x00
+	USART(u8 USART=1,uint32_t baud=9600,bool useDMA=false, u8 remap=0x00,u8 Prioritygroup=3,uint8_t preemprionPriority=7,uint8_t subPriority=1,u8 dmaPriority=3
 			,uint16_t parity=USART_Parity_No,uint16_t wordLength=USART_WordLength_8b, uint16_t stopBits=USART_StopBits_1);
-
 
 	///////////////////
 	///@breif 串口发送数据
@@ -112,14 +112,24 @@ public:
 	
 	
 	///////////////////////////
-	///@breif output character reload
+	///@breif print integer reload
 	///@param val the integer value that will be print to USART as characters
 	///////////////////////////
 	USART& operator<<(int val);
 	
 	
+	/////////////////////////////
+	///@breif print double reload
+	/////////////////////////////
+	USART& operator<<(double val);
+	
+	////////////////////////////
+	///set the precision of double output
+	////////////////////////////
+	USART& Setprecision(const unsigned char precision);
+	
 	///////////////////////////
-	///@breif output character reload
+	///@breif print character reload
 	///@param the string's first character adress value that will be print to USART as characters
 	///////////////////////////
 	USART& operator<<(const char* pStr);

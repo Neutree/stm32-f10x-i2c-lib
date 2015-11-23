@@ -95,9 +95,6 @@ u16 USART::ReceiveBufferSize()
 ///@param USART	 选择串口编号 1-3 ,对应的引脚请看下面重映射处        default:1
 ///@param baud -串口的波特率              default:9600
 ///@param useDMA  true:if you want to send data by DMA false:don't use dma to send data
-///@param Prioritygroup -中断优先级分组   default:3  优先级分组详情请看文件末尾
-///@param preemprionPriority -抢占优先级  default:7  优先级分组详情请看文件末尾
-///@param subPriority -响应优先级         default:1  优先级分组详情请看文件末尾
 ///@param remap -if remap 0x00:no remap  0x01:half remap 0x11:remap  default:0x00
 ///	remap		0x00		0x01		0x11
 /// usart1Tx	PA9			PB6
@@ -106,13 +103,17 @@ u16 USART::ReceiveBufferSize()
 /// usart2Rx	PA3			PD6
 /// usart3Tx	PB10		PC10		PD8
 /// usart3Rx	PB11		PC11		PD9
+///@param Prioritygroup -中断优先级分组   default:3  优先级分组详情请看文件末尾
+///@param preemprionPriority -抢占优先级  default:7  优先级分组详情请看文件末尾
+///@param subPriority -响应优先级         default:1  优先级分组详情请看文件末尾
+///@param dmaPriority set the priority of DMA default:3(low) (0:DMA_Priority_VeryHigh 1:DMA_Priority_High 2:DMA_Priority_Medium 3:DMA_Priority_Low)
 ///@param  parity usart parity value: USART_Parity_No  USART_Parity_Even  USART_Parity_Odd      default:USART_Parity_No
 ///@param  wordLength   USART_WordLength_9b  USART_WordLength_8b                                default:USART_WordLength_8b
 ///@param  stopBits  USART_StopBits_1 USART_StopBits_0_5  USART_StopBits_2  USART_StopBits_1_5  default:USART_StopBits_1
 ////////////////////
-USART::USART(u8 USART,uint32_t baud,bool useDMA,u8 Prioritygroup,uint8_t preemprionPriority,uint8_t subPriority,u8 remap
+USART::USART(u8 USART,uint32_t baud,bool useDMA,u8 remap,u8 Prioritygroup,uint8_t preemprionPriority,uint8_t subPriority,u8 dmaPriority
 				,uint16_t parity,uint16_t wordLength, uint16_t stopBits)
-	:isBusySend(0),mUseDma(useDMA)
+	:isBusySend(0),mUseDma(useDMA),mPrecision(3)
 {
 	GPIO_InitTypeDef GPIO_InitStructureTx,GPIO_InitStructureRx;//
 	GPIO_TypeDef* USART_GPIO;//端口号
@@ -280,7 +281,20 @@ USART::USART(u8 USART,uint32_t baud,bool useDMA,u8 Prioritygroup,uint8_t preempr
 		DMA_InitStructure.DMA_Mode = DMA_Mode_Normal ;
 
 		//优先级：低
-		DMA_InitStructure.DMA_Priority = DMA_Priority_Low;  
+		switch(dmaPriority){
+			case 0:
+				DMA_InitStructure.DMA_Priority = DMA_Priority_VeryHigh;  
+				break;
+			case 1:
+				DMA_InitStructure.DMA_Priority = DMA_Priority_High;  
+				break;
+			case 2:
+				DMA_InitStructure.DMA_Priority = DMA_Priority_Medium;  
+				break;
+			default:
+				DMA_InitStructure.DMA_Priority = DMA_Priority_Low;  
+				break;
+		} 
 
 		//禁止内存到内存的传输	
 		DMA_InitStructure.DMA_M2M = DMA_M2M_Disable;
@@ -361,42 +375,59 @@ USART::~USART()
 ///////////////////////////
 USART& USART::operator<<(int val)
 {
-	short i;
-	uint8_t str=0;
-	if(val==0)
-	{
-		str= '0';
-		SendData(&str,1);
-		return *this;
-	}
-	
+	u8 sign = 0, len = 0,data[10];
 	if(val<0)
 	{
-		str= '-';
-		SendData(&str,1);
-		val=-val;
+		sign = 1;
+		val = -val;
 	}
-	for( i=9;i>=0;--i)
+	do
 	{
-		if( ((int)(val/(pow(10.0,i)))%10) )//find first valid value
-		{
-			break;
-		}
-	}
-	for(u8 j=0;j<=i;++j)
-	{
-		str= ((int)(val/pow(10.0,i-j)))%10 +'0' ;
-		SendData(&str,1);
-	}
-	if(i<0)
-	{
-		str= 0+'0';
-		SendData(&str,1);
-	}
-	
+		len++;
+		data[10-len] = val%10 + '0';
+		val = val/10;
+	}while(val);
+	if(sign==1)
+		data[10-(++len)] = '-';
+	SendData(data+10-len,len);
 	return *this;
 }
 
+
+USART& USART::operator<<(double val)
+{
+	u8 sign = 0, len = 0,data[20];
+	if(val<0)
+	{
+		sign = 1;
+		val = -val;
+	}
+	u8 prec = mPrecision;
+	while(prec--)
+		val *= 10;
+	u32 t = val;
+	do
+	{
+		if(++len==mPrecision+1) data[20-len] = '.';
+		else
+		{
+			data[20-len] = t%10 + '0';
+			t = t/10;
+		}
+	}while(t || len<mPrecision+2);
+	//if(len==3) data[20-(++len)] = '.';
+	//if(len==4) data[20-(++len)] = '0';
+	if(sign==1)
+		data[20-(++len)] = '-';
+	SendData(data+20-len,len);
+	return *this;
+}
+
+USART& USART::Setprecision(const unsigned char precision)
+{
+	mPrecision=precision;
+	return *this;
+}
 ///////////////////////////
 ///@breif output character reload
 ///@param the string's first character adress value that will be print to USART as characters

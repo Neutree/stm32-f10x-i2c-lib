@@ -1,7 +1,21 @@
 /**
   *@file I2C.h
-  *@author Neutree
+  *@author Neucrack
   *@breif I2C driver for stm32f10x
+  *   how to use it:
+  *      * import 'I2C.cpp', 'Interrupt.cpp' to your project and add 'I2C.h', 'Interrupt.h', 'FIFOBuffer.h' to your project lib,
+  *      * creat a I2C object such as 
+  *                                  ```C++ 
+  *                                       I2C iic(1,false);
+  *                                  ```
+  *      * use the object to operate iic devices @see I2C. such as:
+  *                                  ```C++
+  *                                      iic.iic.AddCommand(0xd0,0x75,0,0,temp,1);
+  *                                      if(!iic.StartCMDQueue())  //or if(!iic.StartCMDQueue(3)) (add time out parameter)
+  *                                      {
+  *                                         iic.Init();
+  *                                      }	
+  *                                  ```
   *@copyright CQUT IOT Lib all rights reserved
   */
 
@@ -17,14 +31,21 @@
 #include "FIFOBuffer.h"
 #include "Delay.h"
 
+	/** @defgroup I2C_Configuration_Block
+	  * @{
+	  */
 /****************************************************************************************/
 
-						#define I2C_QUEUE_MAX_SIZE    40
-						
-//						#define USE_ERROR_CALLBACK                 /*  use iic error  callback */
+						#define I2C_QUEUE_MAX_SIZE    40 //The max size of i2c command queue
+						#define I2C_USE_DMA              //uncomment it if you want to use DMA for USART
+//						#define USE_ERROR_CALLBACK       //  use iic error  callback ** this one can not be used now **
 							
 //						#define DEBUG
 /****************************************************************************************/
+
+	/**
+	  *@}
+	  */
 #ifdef DEBUG
 	#include "USART.h"
 	extern USART usart1;
@@ -88,20 +109,31 @@ class I2C
 	private:
 		I2C_TypeDef* mI2C;        //i2c device name
 		u32          mSpeed;      //i2c bus speed
-		bool           mRemap;    //whether gpio pin remap
+		bool         mRemap;      //whether gpio pin remap
+		bool         mUseDma;     //whether use DMA
+		uint8_t      mPriority[6];//priority table
 		I2C_State    mState;      //i2c bus state flag
 		u16 mIndex_Send;          //send data flag
-		uint32_t mDmaRxTcFlag,mDmaTxTcFlag;         //DMA tranmite complete flag adress
 		FIFOBuffer<I2C_Command_Struct,I2C_QUEUE_MAX_SIZE> mCmdQueue;       //iic cmd queue
-		I2C_Command_Struct mCurrentCmd;             //current command should be execute variable
+		I2C_Command_Struct mCurrentCmd;                       //current command should be execute variable
+	#ifdef I2C_USE_DMA
+		uint32_t mDmaRxTcFlag,mDmaTxTcFlag;                   //DMA tranmite complete flag adress
 		DMA_Channel_TypeDef *mDmaTxChannel,*mDmaRxChannel;    //iic dma channel 
-		DMA_InitTypeDef mDMA_InitStructure;
+		DMA_InitTypeDef mDMA_InitStructure;                   //i2c dma configuration 
+	#endif
 		/////////////////////////
 		///soft reset iic Peripheral(reset register related to iic peripheral)
 		/////////////////////////
 		void Soft_Reset(void);
 		void I2CGPIODeInit(uint16_t sclPin,uint16_t sdaPin);
 		void I2CGPIOInit(uint16_t sclPin,uint16_t sdaPin);
+		///////////////////////
+		///check the iic bus if was locked by slave,if do,clear it
+		///@param i2cClock iic clock
+		///@param sclPin iic scl pin
+		///@param sdaPin iic sda pin
+		///@retval true: if check and fix succeed false: error occur, check and fix fail
+		///////////////////////
 		bool I2C_CHACK_BUSY_FIX(uint32_t i2cClock,uint16_t sclPin,uint16_t sdaPin);
 		void DelayUs(u32 nus);
 		void DelayMs(u16 nms);
@@ -111,8 +143,9 @@ class I2C
 		/////////////////////////////////////
 		///@breif IIC initialization function
 		///@param i2cNumber select which IIC peripheral to init
+		///@param useDMA true: if defined I2C_USE_DMA @see I2C_Configuration_Block use DMA to operate iic device false: do not use dma for iic 
 		///@param speed define the speed of iic bus 
-		///@param remap select whether to use iic GPIO remap ,only of I2C1,I2C2 do not have remap GPIO
+		///@param remap select whether to use iic GPIO remap ,only of I2C1,I2C2 do not have remap GPIO @see I2C_Pin_Table at the end of this file
 		///@param priorityGrouop Choose which priorityGroup to use,payattention,only one should be used in one project
 		///@param preemprionPriorityEvent Iic event interrupt preemprion priority should bigger than iic error and iic dma priority
 		///@param subPriorityEvent IIC event interrupt subpriority
@@ -124,31 +157,16 @@ class I2C
 		///@attention only one group should be used in one project. 
 		///           The bigger the priority value,the lower level priority.Every group's detail @see NVIC_Priority_Table at the end of this file
 		/////////////////////////////////////
-		I2C(u8 i2cNumber=1,u32 speed=400000,u8 remap=0,u8 priorityGroup=3,
+		I2C(u8 i2cNumber=1,bool useDMA=false,u32 speed=400000,u8 remap=0,u8 priorityGroup=3,
 					uint8_t preemprionPriorityEvent=2,uint8_t subPriorityEvent=0,
 					uint8_t preemprionPriorityError=0,uint8_t subPriorityError=0,
 					uint8_t preemprionPriorityDma=1,uint8_t subPriorityDma=0);
 	
 		/////////////////////////////////////
 		///@breif IIC initialization function
-		///@param i2cNumber select which IIC peripheral to init
-		///@param speed define the speed of iic bus 
-		///@param remap select whether to use iic GPIO remap ,only of I2C1,I2C2 do not have remap GPIO
-		///@param priorityGrouop Choose which priorityGroup to use,payattention,only one should be used in one project
-		///@param preemprionPriorityEvent Iic event interrupt preemprion priority should bigger than iic error and iic dma priority
-		///@param subPriorityEvent IIC event interrupt subpriority
-		///@param preemprionPriorityError IIC error interrupt preemprion priority should smaller than iic error and iic dma priority
-		///@param subPriorityError IIC error interrupt subpriority
-		///@param preemprionPriorityDma IIC dma interrupt preemprion priority should between  iic error and iic dma priority
-		///@param subPriorityDma IIC dma interrupt subpriority
 		///@retval Is initialization success
-		///@attention only one group should be used in one project. 
-		///           The bigger the priority value,the lower level priority.Every group's detail @see NVIC_Priority_Table at the end of this file
 		/////////////////////////////////////
-		bool Init(u8 i2cNumber=1,u32 speed=400000,u8 remap=0,u8 priorityGroup=3,
-					uint8_t preemprionPriorityEvent=2,uint8_t subPriorityEvent=0,
-					uint8_t preemprionPriorityError=0,uint8_t subPriorityError=0,
-					uint8_t preemprionPriorityDma=1,uint8_t subPriorityDma=0);
+		bool Init();
 		
 		
 		///////////////////////////
@@ -164,36 +182,41 @@ class I2C
 		u8 IsSendOk();
 		
 		//////////////////////////
-		///wait until transfer complete
+		///wait until transmission complete
 		///@param errorReset if init the iic bus when error occured
 		///@param errorClearCmdQueue If clear the iic command queue when error occured
+		///@param errorRestart Whether restart the queue until the queue is empty if occured any error
+		///      * if this param is set to true, no matter param 'errorReset' if set to true, 
+		///     it will reset and initialize iic first, then execute the remaining command in the queue 
+		///      * if this param is set to false, when this function return false, the queue may not empty because of error
+		///@retval true:transmission complete  false: occured some wrong
 		//////////////////////////
-		bool WaitTransferComplete(bool errorReset,bool errorClearCmdQueue);
+		bool WaitTransmitComplete(bool errorReset=true,bool errorClearCmdQueue=false,bool errorResart=true);
 		
 		
 		/////////////////////////////
-		///@param deviceAddr The address of slave device
-		///@param registerAddr The register adress of slave
+		///@param slaveAddr The address of slave device
+		///@param registerAddr The register adress of slave,if you don't write register,just fill it with 0xff
 		///@param dataWrite The head adress of send data array
 		///@param sendNum The length of send data
 		///@param dataRead The head  adress of received data array
 		///@param receiveNum The length of receive data
 		/////////////////////////////
-		bool AddCommand(u8 deviceAddr,u8 registerAddr, u8* dataWrite, u8 sendNum,u8* dataRead, u8 receiveNum);
+		bool AddCommand(u8 slaveAddr,u8 registerAddr, u8* dataWrite, u8 sendNum,u8* dataRead, u8 receiveNum);
 		
 		////////////////////////////////////////////////////
 		///在调用开始执行命令队列中的命令时会对当前的总线状态进行检查，
 		///若连续timeOutMaxTime次都是一样的状态（STATE_READY除外），则判定为超时 
 		///befor start signal,it will check the status of iic bus 
 		///if the status timeOutMaxTime consecutive times the same,it will be regarded as an time out error has occurred 
-		///@param timeOutMaxTime 超时计时最大值，若连续timeOutMaxTime次调用此函数时iic的状态都是同一状态，
-		///       则判定为超时（引起的原因可能是总线出现错误，但是不会产生错误中断,比如从机vcc断开）
+/*		///@param timeOutMaxTime 超时计时最大值，可以不使用，为防止出现有时出现无法检测到的错误的情况发生，建议使用。
+		///       若连续timeOutMaxTime次调用此函数时iic的状态都是同一状态，则判定为超时（引起的原因可能是总线出现错误，但是不会产生错误中断,比如从机vcc断开）
 		///       if the status timeOutMaxTime consecutive times the same,it will be regarded as an time out error has occurred 
-		///@retval If the success to send start signal 1:signal will be send 0:some error occured
+*/		///@retval If the success to send start signal 1:signal will be send 0:some error occured 2: queue is empty
 		///@attention The value of timeOutMaxTime should be valued Correctly, set the value according to the Interval of invoke this function
 		///           eg: if Interval is too short and timeOutMaxTime is too little,it can due to iic bus's error
 		///////////////////////////////////////////////////
-		u8 StartCMDQueue(uint32_t timeOutMaxTime);
+		u8 StartCMDQueue(/*uint32_t timeOutMaxTime=80*/);
 		
 		
 		///////////////////////////
@@ -212,8 +235,9 @@ class I2C
 		///i2c error interrupt handler
 		///@attention It should be put in the iic error interrupt function
 		////////////////////////
-		void ErrorIRQ(void);     
+		void ErrorIRQ(void);  
 		
+	#ifdef I2C_USE_DMA
 		/////////////////////////
 		///i2c send DMA interrupt function
 		///@attention It should be put in the iic send DMA interrupt function
@@ -225,7 +249,7 @@ class I2C
 		///@attention It should be put in the iic reveive DMA interrupt function
 		////////////////////////
 		void DmaRxIRQ(void);
-		
+	#endif
 		////////////////////////////
 		///return the number of iic
 		///@retval return the number of iic
@@ -344,7 +368,29 @@ typedef enum
 	  * @}
 	  */
 
+	/** @defgroup I2C_Pin_Table 
+	  * @{
+	  */
 
+	/**
+	@code  
+	 The table below gives the allowed values of the pre-emption priority and subpriority according
+	 to the Priority Grouping configuration performed by NVIC_PriorityGroupConfig function
+	  =========================================
+		|  I2C | remap=false |  remap=true |
+		|------|-------------|-------------|
+		| I2C1 |SCL  PB6     |   SCL  PB8  |
+		|      |SDA  PB7     |   SDA  PB9  |
+		|======|=============|============ |
+		| I2C2 |SCL  PB10    |   --------  |
+		|      |SDA  PB11    |   --------  |
+	  =========================================
+	@endcode
+	*/
+
+	/**
+	  * @}
+	  */
 
 #endif
 
